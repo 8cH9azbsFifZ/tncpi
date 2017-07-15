@@ -1,0 +1,283 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+  <title>Installing a TNC-Pi </title>
+  <meta http-equiv="CONTENT-TYPE" content="text/html; charset=UTF-8">
+  <link rel="stylesheet" type="text/css" href="styles/doc.css">
+  <link rel="shortcut icon" href="images/logo1.ico">
+  <style type="text/css">  </style>
+</head>
+<body>
+<h1 title="How to Configure a TNC-Pi on a Raspberry "> Configure a TNC-Pi for a Raspberry Pi. 
+<img src="images/481.jpg" alt="Linux RPi" ></h1>
+<p class="date">Updated 7 Dec 2016</p>
+
+<address style="text-align: center; font-size: 15px;">
+Charles S. Schuman, K4GBB<br>
+<a style="text-align: center; font-size: 13px;" href="mailto:k4gbb1@gmail.com">
+ k4gbb1@gmail.com</a><br></address>
+<p></p>
+<p>If you have not already done so, update your Operating System. <br>To update your OS -You must have an Internet access - ( either Ethernet or Wireless network connectivity)</p>
+<p> From the command line enter the following commands:</p>
+<p class="command">sudo apt-get update <br>sudo apt-get upgrade <br>sudo apt-get dist-upgrade </p>
+
+<h2>Install Ax.25</h2>
+<p>The ax.25 support must be installed. For help with the installation of  Libax25, Ax25-tools and 
+Ax25-apps go to <a href="raspberry.html#SD_Card">Install Ax.25</a></p>
+
+<p>Once Libax25, ax25-tools and ax25-apps are installed.</p>
+<p>Create or edit the /etc/ax25/axports file.<br>It should look like this.</p>
+<pre># Port	 Callsign	Baud	PacLen	MaxFram   Descriptions
+0	N4TPO-1		19200	256	5	Radio - 145.030 MHz
+# (End axports)</pre>
+
+<h2>TNC-Pi setup for a serial port</h2>
+<p>The Raspberry Pi is shipped configured to use the single serial port as a Local Terminal.<br> Use the raspi-config menu to set the serial port so that it releases the serial port.</p>
+
+<p class="command"> sudo raspi-config</p>
+<p>On the Raspi Config menu -<br>Go to <b>Advanced Options</b><br> choose <b>Serial</b> <br>select <b>NO</b></p>
+
+<h3>Raspberry B3</h3>
+<p>You may have heard that the serial port on a RPi B3 will show up as 
+/dev/ttyS0.</p>
+<p> The following changes will re-configure the devices so that the serial port will be /dev/ttyAMA0. This keeps the device name constant over all the earlier Raspberries models. The Bluetooth device will then be /dev/ttyS0.</p>
+<ol>
+  <li>Edit the <u>/boot/config.txt</u> file to change the line:
+<pre>enable_uart=0 
+     to 
+ enable_uart=1</pre>
+<li>Add following the lines to <u>/boot/config.txt</u>.
+<pre>dtoverlay=pi3-miniuart-bt
+core_freq=250</pre>
+
+ <li><p>Add the following lines to <u>/lib/systemd/system/hciattach.service</u>.
+<br>Create the <i>/lib/systemd/system/hciattach.service</i> file if it does not exist.</p>
+<pre>[Unit]
+ConditionPathIsDirectory=/proc/device-tree/soc/gpio@7e200000/bt_pins
+Before=bluetooth.service
+After=dev-ttyS0.device
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/hciattach /dev/ttyS0 bcm43xx 921600 noflow -
+
+[Install]
+WantedBy=multi-user.target
+</pre>
+
+<li>Reboot the Pi to put the changes into effect.
+</ol>
+
+<!--
+ <p>To manually re-configure this serial port for use with the TNC-Pi:
+<ol>
+<li>Edit the /boot/cmdline.txt file in the boot directory and change the single line:<br>
+<code> dwc_otg.lpm_enable=0 console=ttyAMA0,115200 kgdboc=ttyAMA0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline rootwait</code><br>
+to read<br>
+<code>dwc_otg.lpm_enable=0 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline rootwait</code>
+</li>
+<li><p>Then edit the /etc/inittab file and place a # in front of the the line that says:</p>
+<code>T0:23:respawn:/sbin/getty –L ttyAMA0 115200 vt100 </code>
+<p>It is the last line of the file.</p></li>
+-->
+
+<p>The TNC-PI is shipped with it's NVRAM configured for serial operation. The KISS parms
+may not be suitable for your operation.</p>
+
+<p>The <i>kissparms</i> utility does not work with the TNC-Pi. To Set the kissparms you will have to use the <i>setparam</i> utility. You only need set them once. The values will be retained in the TNC's NVRAM. </p>
+<ol>
+<li><p>Download  the <a href="http://www.tnc-x.com/params.zip"> Param tools</a>, extract and place the <i>pitnc_getparams and pitnc_setparams</i> files in the /usr/local/sbin/ dir, and make them executable.</p> 
+<p>If you use the Un-official ax25 source you will have to add a link to the RT Library routines.</p>
+<p class="command">sudo ln -s /usr/local/lib/libax25.so.1 /usr/lib/libax25.so.0 </p>
+</li>
+<li>On the older versions of the TNC-Pi Jumpers JP 3 & 4 should be installed.</li>
+<li>Make sure that /dev/ttyAMA0 is free. It should not be attached or bound to any service.</li>
+<li>Read the KISS Parameters.
+<p>At the Raspberry's command line execute the Getparams command.</p>
+<p class="command">sudo /usr/local/sbin/pitnc_getparams 1 0 </p>
+<p>The syntax for the pitnc_getparams program is:<br>
+		<b>pitnc_getparams  &lt;bus&gt;  0</b><br>
+
+where -<br>
+<b>bus</b> is the number of the I2C bus.....<br> 
+<span style="color:red;margin-left:20px;">
+	Revision 1 PI boards (without mounting holes) the i2c bus number is zero<br> 
+&nbsp;&nbsp;&nbsp;&nbsp;Revision 2 PI boards the i2c bus number is 1</span><br>
+<b>0</b> is the device number for the serial port.</p> 
+The pitnc_getparams utility output will then list the values for all of the user settable parameters.
+
+<pre>01 TXDelay - Zero means use ADC  <mark>00</mark>
+02 Persistance                   <mark>64</mark>
+03 Slottime (in 10 mS)           <mark>10</mark>
+04 TXTail                         <mark>0</mark>
+05 Full Duplex - Not used         <mark>0</mark>
+06 Our Channel (Hex)             <mark>00</mark>
+07 I2C Address (0 = async) Hex   <mark>00</mark>
+   ADC Value                     <mark>28</mark>
+8 0 00 40 a 0 0 0 0 1c 74 c0 sum 2</pre>
+<li>Set the KISS Param.<br>
+
+<p>The syntax for the pitnc_setparams program is:<br>
+<b>pitnc_setparams &lt;bus&gt; &lt;0&gt; &lt;parm&gt; &lt;value&gt;</b>
+<br>where -<br>
+<b>bus</b> is the number of the I2C bus<br>
+<b>0</b> is the number for the serial port on that bus.<br>
+<b>Parm</b> is the number of the parameter from the list below.<br>
+<b>Value</b> is the new value to be set.</p>
+</ol>
+<p>The Command</p>
+<p class="command">sudo pitnc_setparams 1 0 1 250 </p>
+<p>Sets the TxDelay. <br>
+With TNC-Pi you can set the TXDelay either in software or in hardware using R6 on the TNC board. <br>
+    Setting this parameter to 0 causes the TNC-Pi R6 potentiometer to determine the value.</p>
+
+<h3>Parameters</h3>
+<ol>
+<li>TxDelay</li>
+<li> Persistance</li>
+<li> Slottime</li>
+<li> TxTail</li>
+<li> FD - Full duplex (not Used)</li>
+<li> Our Channel (Hex)</li>
+<li> I2C address ( 0 = async) Hex
+<p>Setting the I2C address to 0 sends data to the serial port (default).<br>
+ Values 3 to 119 will enable the TNC to be used with I2C, using (value) as it's address.
+</p></li>
+
+<li>Set other KISS parameters as needed.</li>
+<li> Restart the TNC once the KISS parameters are set.
+     <p class="command">sudo pitnc_setparams &lt;bus&gt; &lt;device&gt; 15 2 </p>
+</ol>
+<br><br>
+<h2>Opening an AX25 socket with TNC-Pi as a Serial device</h2>
+<p>Open an Ax.25 socket with the command.</p>
+<p class="command">sudo kissattach /dev/ttyAMA0 &lt;axport&gt; &lt;ip address&gt;</p>
+<p>axport = the port name from the <u>/etc/axports</u> file</p>
+<p>ip address – An address is required by some versions of kissattach.<br>
+The address will prob never be used so use 44.128.1.0 - an AMPR Net test address.</p>
+<p>Example:</p>
+<p class="code"><b>   kissattach /dev/ttyAMA0 0 44.128.1.0</b></p>
+
+<br><br>
+<h2>TNC-Pi setup for the I2C buss.</h2>
+<p>The TNC-Pi NVRAM comes configured for serial operation. The TNC-Pi may also be configured to communicate with the Raspberry Pi using the I2C protocol. </p>
+
+<p>To configure the TNC-Pi for I2C, you will need the programs pitnc_setparams and pitnc_getparams. The getparams program reads the parameters from the TNC-Pi while the setparams program allows you to set them. These programs are available at: http:// www.tnc-x.com/params.zip</p>
+<p>In the Raspberry<br>
+re-run the Raspi Config Tool</p>
+<p class="command"> sudo raspi-config</p>
+<p>On the Raspi Config m
+enu - Go to <b>Advanced Options</b> and choose <b>I2C</b> then select <b>YES</b> to enable the I2C buss and <b>YES</b> to load the I2C module at boot up.</p>
+To manually enable the I2C buss make the following changes:
+<ol>
+<li> in the /etc/modprobe.d/raspi-blacklist.conf file, remove the line: <br>
+<code> blacklist i2c-bcm2708</code></li>
+<li>in the etc/modules file, add the line:<br>
+<code> i2c-dev </code>
+</li></ol>
+<p>Download  the <a href="http://www.tnc-x.com/params.zip"> Param tools</a>, extract and move the <i>pitnc_getparams</i> and <i>pitnc_setparams</i> files to the /usr/local/sbin/ dir.<br> Then make them executable.</p>
+<p class="command">sudo wget http://www.tnc-x.com/params.zip<br>
+sudo unzip params.zip <br>
+sudo mv pitnc_* /usr/local/sbin/<br>
+sudo chmod +x /usr/local/sbin/pitnc_*</p>
+
+<p>If you use the Un-official ax25 source you will have to add a link to the RT Library routines.</p>
+<p class="command">sudo ln -s /usr/local/lib/libax25.so.1 /usr/lib/libax25.so.0 </p> 
+
+<p>Configure the TNC-Pi boards one at a time.</p>
+<ol> 
+<li>  Remove the Other TNC boards from atop the Raspberry or remove JP 7 (power) on the other TNCs. </li>
+<li>On older TNC-Pi models Jumpers JP 3 & 4 should be installed on the TNC to be configured.</li>
+<li>Make sure that /dev/ttyAMA0 is free. It should not be attached or bound to any service.</li>
+
+<li>Read the KISS Parameters.<p>At the RPI command line execute the Getparams command.</p>
+<p class="command"> sudo /usr/local/sbin/pitnc_getparams 1 0 </p>
+<p>The syntax for the pitnc_getparams program is:<br>
+		<b>pitnc_getparams  &lt;bus&gt;  0</b><br>
+
+where -<br>
+<b>bus</b> is the number of the I2C bus.....<br> 
+<span style="color:red;margin-left:20px;">
+	Revision 1 PI boards (without mounting holes) the i2c bus number is zero<br> 
+&nbsp;&nbsp;&nbsp;&nbsp;Revision 2 PI boards the i2c bus number is 1</span><br>
+<b>0</b> is the device number for the serial port.</p> 
+The pitnc_getparams utility output will then list the values for all of the user settable parameters.
+<pre class="example">01 TXDelay - Zero means use ADC  <mark>00</mark>
+02 Persistance                   <mark>64</mark>
+03 Slottime (in 10 mS)           <mark>10</mark>
+04 TXTail                         <mark>0</mark>
+05 Full Duplex - Not used         <mark>0</mark>
+06 Our Channel (Hex)             <mark>00</mark>
+07 I2C Address (0 = async) Hex   <mark>00</mark>
+   ADC Value                     <mark>28</mark>
+8 0 00 40 a 0 0 0 0 1c 74 c0 sum 2</pre>
+<li>Set the i2c address - 
+<p class="command">sudo pitnc_setparams 0 1 7  &lt;i2c-address &gt;</p>
+<li>Set the KISS Param.<br>
+<p>The syntax for the pitnc_setparams program is:<br>
+<b>pitnc_setparams &lt;bus&gt; &lt;0&gt; &lt;parm&gt; &lt;value&gt;</b>
+<br>where -<br>
+<b>bus</b> is the number of the I2C bus<br>
+<b>0</b> is the number for the serial port on that bus.<br>
+<b>Parm</b> is the number of the parameter from the list below.<br>
+<b>Value</b> is the new value to be set.</p>
+<p>The Command</p>
+<p class="command">sudo pitnc_setparams 1 0 1 250 </p>
+<p>Sets the TxDelay. <br>
+With TNC-Pi you can set the TXDelay either in software or in hardware using R6 on the TNC board. <br>
+    Setting this parameter to 0 causes the TNC-Pi R6 potentiometer to determine the value.</p>
+
+<h3>Parameters</h3>
+<ol>
+<li>TxDelay</li>
+<li> Persistance</li>
+<li> Slottime</li>
+<li> TxTail</li>
+<li> FD - Full duplex (not Used)</li>
+<li> Our Channel (Hex)</li>
+<li> I2C address ( 0 = async) Hex
+<p>Setting the I2C address to 0 sends data to the serial port (default).<br>
+ Values 3 to 119 will enable the TNC to be used with I2C, using (value) as it's address.
+</p></li></ol>
+<li>Set other KISS parameters as needed.
+<br>
+<li>On the older versions of the TNC-Pi, Remove Jumpers 3 & 4 from the configured TNC-PI.</li>
+<li> Reboot.</li>
+</ol>
+
+<h2>Running applications with TNC-Pi in I2C mode</h2>
+<p>The TNC-PI can be used with applications that use the Linux ax.25 stack, or applications that expect to see a KISS TNC on a serial port.<br>
+ The i2ckiss program which converts i2c to a standard KISS protocol via a virtual serial (pty) port is available at <a href="http://www.tnc-x.com/i2ckiss.zip"> http://www.tnc-x.com/i2ckiss.zip</a></p>
+<p>Download, extract, and move i2ckiss to the /usr/local/sbin/ dir.<br>Then make the file executable.</p>
+<p class="command">sudo wget http://www.tnc-x.com/I2ckiss.zip<br>
+sudo unzip I2ckiss.zip<br>
+sudo mv i2ckiss /usr/local/sbin/<br>
+sudo chmod +x /usr/local/sbin/i2ckiss</p>
+
+<p>To create an AX.25 socket use i2ckiss in place of kissattach. <br>Run a proc of i2ckiss for each TNC-PI. 
+<p class="command">sudo i2ckiss   &lt;bus&gt;   &lt;device&gt; &lt;axport&gt;  44.142.1.1</p>
+
+<p>The parameters to the i2ckiss command are i2c bus,<i> i2c device,</i> followed by the <i>port name</i> (from axports) <br>and an ip address. </p>
+<p>The address probably will not be used for routing so the AMPR Net Test address - 44.128.1.1 may safely be used.<br> 
+For example:</p>
+	<code>i2ckiss 0 3 1 44.128.1.1 </code>
+<p> will create a pty pair, and execute kissattach on the pty side using the 3rd and 4th
+parameters.</p>
+
+<footer>
+<p>
+    <a href="http://jigsaw.w3.org/css-validator/check/referer">
+        <img style="border:0;width:88px;height:31px"
+            src="http://jigsaw.w3.org/css-validator/images/vcss"
+            alt="Valid CSS!" />
+    </a>
+<small>COPYRIGHT &copy; 2010&mdash;2017 
+      <a href="http://validator.w3.org/check?uri=referer">
+          <img class="valid" 
+          src="http://jigsaw.w3.org/css-validator/images/vh40.gif" 
+          alt="Valid HTML 4.0 Transitional" />
+      </a><br>
+ALL RIGHTS RESERVED<br>k4gbb.no-ip.info</small>
+</p>
+</footer>
+</body></html>
